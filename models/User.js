@@ -39,6 +39,17 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 150,
+    },
+    recoveryPhrase: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     fcmTokens: {
       type: [String],
       default: [],
@@ -100,6 +111,7 @@ userSchema.methods.toSafeObject = function toSafeObject() {
     email: this.email,
     username: this.username || "",
     avatar: this.avatar,
+    bio: this.bio,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

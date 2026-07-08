@@ -20,7 +20,7 @@ function usernameToEmail(username) {
 
 async function register(req, res, next) {
   try {
-    let { name, email, password, username } = req.body;
+    let { name, email, password, username, recoveryPhrase } = req.body;
 
     // Legacy app sends username+password; map to modern schema.
     if (username && !email) {
@@ -68,6 +68,7 @@ async function register(req, res, next) {
       email: normalizedEmail,
       ...(normalizedUsername ? { username: normalizedUsername } : {}),
       password: String(password),
+      recoveryPhrase: recoveryPhrase ? String(recoveryPhrase).trim() : "",
     });
 
     const token = generateToken(user._id);

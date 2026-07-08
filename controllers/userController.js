@@ -23,7 +23,7 @@ async function searchUsers(req, res, next) {
       _id: { $ne: req.user._id },
       $or: [{ name: regex }, { email: regex }],
     })
-      .select("name email avatar createdAt updatedAt")
+      .select("name email avatar bio createdAt updatedAt")
       .limit(limit)
       .sort({ name: 1 });
 
@@ -35,7 +35,7 @@ async function searchUsers(req, res, next) {
 
 async function updateProfile(req, res, next) {
   try {
-    const { name, avatar } = req.body;
+    const { name, avatar, bio } = req.body;
 
     if (typeof name !== "undefined") {
       req.user.name = String(name).trim();
@@ -43,6 +43,10 @@ async function updateProfile(req, res, next) {
 
     if (typeof avatar !== "undefined") {
       req.user.avatar = String(avatar).trim();
+    }
+
+    if (typeof bio !== "undefined") {
+      req.user.bio = String(bio).trim();
     }
 
     await req.user.save();
