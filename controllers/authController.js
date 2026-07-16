@@ -174,9 +174,68 @@ async function checkUser(req, res, next) {
   }
 }
 
+async function resetPassword(req, res, next) {
+  try {
+    const { username, recoveryPhrase, newPassword } = req.body;
+    
+    if (!username || !recoveryPhrase || !newPassword) {
+      return res.status(400).json({ success: false, error: "Username, recovery phrase, and new password are required" });
+    }
+
+    const normalizedUsername = normalizeUsername(username);
+    const user = await User.findOne({
+      $or: [{ username: normalizedUsername }, { email: usernameToEmail(normalizedUsername) }],
+    }).select("+password recoveryPhrase");
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (user.recoveryPhrase !== String(recoveryPhrase).trim()) {
+      return res.status(401).json({ success: false, error: "Invalid recovery phrase" });
+    }
+
+    user.password = String(newPassword);
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password updated successfully" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function verifyRecovery(req, res, next) {
+  try {
+    const { username, recoveryPhrase } = req.body;
+    
+    if (!username || !recoveryPhrase) {
+      return res.status(400).json({ success: false, error: "Username and recovery phrase are required" });
+    }
+
+    const normalizedUsername = normalizeUsername(username);
+    const user = await User.findOne({
+      $or: [{ username: normalizedUsername }, { email: usernameToEmail(normalizedUsername) }],
+    }).select("+recoveryPhrase");
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (user.recoveryPhrase !== String(recoveryPhrase).trim()) {
+      return res.status(401).json({ success: false, error: "Invalid recovery phrase" });
+    }
+
+    res.status(200).json({ success: true, message: "Recovery phrase verified" });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   me,
   checkUser,
+  resetPassword,
+  verifyRecovery,
 };

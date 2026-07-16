@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "493729096769",
+    "project_id": "cyberlink-19b1b",
+    "storage_bucket": "cyberlink-19b1b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:493729096769:android:f147af6c77d30eb9ed92c0",
+        "android_client_info": {
+          "package_name": "com.cyberlink.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcLmIi2M7CVlFqFriBxGYpcoiUCwGK5r8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
