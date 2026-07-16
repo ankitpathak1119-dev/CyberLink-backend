@@ -228,7 +228,7 @@ function setupSocket(io) {
 
       sendFcmToUsernames([to], {
         title: from,
-        body: String(outgoing.message || ""),
+        body: String(outgoing.notificationBody || "New encrypted message"),
         data: {
           type: "private",
           chatId: from,
