@@ -90,18 +90,27 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-userSchema.pre("save", async function hashPassword(next) {
-  if (!this.isModified("password")) {
-    return next();
+userSchema.pre("save", async function hashSensitiveFields(next) {
+  const salt = await bcrypt.genSalt(10);
+
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, salt);
   }
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  if (this.isModified("recoveryPhrase") && this.recoveryPhrase && this.recoveryPhrase.length > 0) {
+    this.recoveryPhrase = await bcrypt.hash(this.recoveryPhrase, salt);
+  }
+
   next();
 });
 
 userSchema.methods.comparePassword = async function comparePassword(plainPassword) {
   return bcrypt.compare(plainPassword, this.password);
+};
+
+userSchema.methods.compareRecoveryPhrase = async function compareRecoveryPhrase(plainPhrase) {
+  if (!this.recoveryPhrase) return false;
+  return bcrypt.compare(plainPhrase, this.recoveryPhrase);
 };
 
 userSchema.methods.toSafeObject = function toSafeObject() {

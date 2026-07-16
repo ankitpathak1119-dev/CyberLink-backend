@@ -191,7 +191,7 @@ async function resetPassword(req, res, next) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    if (user.recoveryPhrase !== String(recoveryPhrase).trim()) {
+    if (!(await user.compareRecoveryPhrase(String(recoveryPhrase).trim()))) {
       return res.status(401).json({ success: false, error: "Invalid recovery phrase" });
     }
 
@@ -221,7 +221,7 @@ async function verifyRecovery(req, res, next) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    if (user.recoveryPhrase !== String(recoveryPhrase).trim()) {
+    if (!(await user.compareRecoveryPhrase(String(recoveryPhrase).trim()))) {
       return res.status(401).json({ success: false, error: "Invalid recovery phrase" });
     }
 

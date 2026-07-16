@@ -106,6 +106,20 @@ async function acceptContactRequest(req, res, next) {
     if (!fromUser.contacts.includes(to)) fromUser.contacts.push(to);
 
     await Promise.all([toUser.save(), fromUser.save()]);
+
+    // Notify the original sender via socket that their request was accepted
+    const io = req.app.get("io");
+    if (io) {
+      io.to(from).emit("contact_accepted", {
+        from: to,
+        to: from,
+        message: `Now you can chat with ${to}`,
+      });
+      // Also notify both users to refresh their contact lists
+      io.to(from).emit("contacts_update", { action: "accepted", user: to });
+      io.to(to).emit("contacts_update", { action: "accepted", user: from });
+    }
+
     res.status(200).json({ success: true, message: "Accepted" });
   } catch (error) {
     next(error);
@@ -204,6 +218,11 @@ async function createGroup(req, res, next) {
         memberUsers.map((u) => [String(u._id), u.username || String(u.email).split("@")[0]])
       ),
     };
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("group_updated", { group });
+    }
 
     res.status(201).json({ success: true, group: publicGroup(chat, usernamesById) });
   } catch (error) {
