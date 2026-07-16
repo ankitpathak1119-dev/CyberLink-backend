@@ -586,6 +586,11 @@ async function createStatus(req, res, next) {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("status_updated", { owner });
+    }
+
     return res.status(201).json({ success: true, status: statusToPublic(status) });
   } catch (error) {
     return next(error);

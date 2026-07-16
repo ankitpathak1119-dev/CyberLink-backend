@@ -68,6 +68,10 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", service: "cyberlink-backend" });
 });
 
+app.get("/", (_req, res) => {
+  res.status(200).json({ success: true, message: "Welcome to Cyberlink API" });
+});
+
 // Legacy mobile-compatible endpoints.
 app.use("/auth", require("./routes/authRoutes"));
 app.use("/", require("./routes/legacyRoutes"));
