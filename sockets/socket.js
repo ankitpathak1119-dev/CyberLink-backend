@@ -240,7 +240,7 @@ function setupSocket(io) {
 
     socket.on("private_message_seen", (payload) => {
       if (!payload || !payload.to || !payload.messageId) return;
-      io.to(String(payload.to)).emit("chat:seen", { messageId: payload.messageId });
+      io.to(normalizeUsername(payload.to)).emit("chat:seen", { messageId: payload.messageId });
     });
 
     socket.on("join_group", (payload) => {

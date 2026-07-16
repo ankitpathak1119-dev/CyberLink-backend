@@ -136,6 +136,16 @@ async function declineContactRequest(req, res, next) {
 
     toUser.contactRequests = toUser.contactRequests.filter((u) => u !== from);
     await toUser.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(from).emit("contact_declined", {
+        from: to,
+        to: from,
+        message: `${to} declined your contact request`,
+      });
+    }
+
     res.status(200).json({ success: true, message: "Declined" });
   } catch (error) {
     next(error);
