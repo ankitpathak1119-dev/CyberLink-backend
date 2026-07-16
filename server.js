@@ -1,6 +1,7 @@
 const http = require("http");
 const express = require("express");
 const dotenv = require("dotenv");
+const path = require("path");
 const helmet = require("helmet");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -76,9 +77,13 @@ app.get("/", (_req, res) => {
 app.use("/auth", require("./routes/authRoutes"));
 app.use("/", require("./routes/legacyRoutes"));
 
+// Serve uploads directory publicly
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/chats", require("./routes/chatRoutes"));
+app.use("/api/upload", require("./routes/uploadRoutes"));
 
 app.use(notFound);
 app.use(errorHandler);
