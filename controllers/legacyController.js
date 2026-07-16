@@ -1,3 +1,4 @@
+const admin = require("firebase-admin");
 const Chat = require("../models/Chat");
 const User = require("../models/User");
 const LegacyMessage = require("../models/LegacyMessage");
@@ -23,9 +24,7 @@ function dedupe(items) {
 async function findUserByUsername(username) {
   const u = normalizeUsername(username);
   if (!u) return null;
-  return User.findOne({
-    $or: [{ username: u }, { email: `${u}@cyberlink.local` }],
-  });
+  return await User.findOne({ username: u });
 }
 
 function publicGroup(chat, usernamesById) {
@@ -52,24 +51,21 @@ async function sendContactRequest(req, res, next) {
   try {
     const from = normalizeUsername(req.body.from);
     const to = normalizeUsername(req.body.to);
-    if (!from || !to || from === to) {
-      return res.status(400).json({ error: "Invalid users" });
-    }
 
-    const fromUser = await findUserByUsername(from);
     const toUser = await findUserByUsername(to);
-
-    if (!fromUser || !toUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (toUser.contacts.includes(from)) {
-      return res.status(200).json({ success: true, message: "Already contacts" });
-    }
+    if (!toUser) return res.status(404).json({ error: "User not found" });
 
     if (!toUser.contactRequests.includes(from)) {
       toUser.contactRequests.push(from);
       await toUser.save();
+    }
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(to).emit("contact_request", {
+        from,
+        message: `${from} sent you a contact request`,
+      });
     }
 
     res.status(200).json({ success: true, message: "Request sent" });
@@ -90,6 +86,21 @@ async function getContactRequests(req, res, next) {
   }
 }
 
+async function notifySenderWithFcm(userDoc, title, body) {
+  if (!admin.apps.length) return;
+  const tokens = (userDoc.fcmTokens || []).filter(Boolean);
+  if (!tokens.length) return;
+  try {
+    await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: { title, body },
+      data: { type: "contact_update" },
+    });
+  } catch (e) {
+    console.error("FCM Send Error:", e);
+  }
+}
+
 async function acceptContactRequest(req, res, next) {
   try {
     const from = normalizeUsername(req.body.from);
@@ -107,7 +118,6 @@ async function acceptContactRequest(req, res, next) {
 
     await Promise.all([toUser.save(), fromUser.save()]);
 
-    // Notify the original sender via socket that their request was accepted
     const io = req.app.get("io");
     if (io) {
       io.to(from).emit("contact_accepted", {
@@ -115,10 +125,11 @@ async function acceptContactRequest(req, res, next) {
         to: from,
         message: `Now you can chat with ${to}`,
       });
-      // Also notify both users to refresh their contact lists
       io.to(from).emit("contacts_update", { action: "accepted", user: to });
       io.to(to).emit("contacts_update", { action: "accepted", user: from });
     }
+    
+    await notifySenderWithFcm(fromUser, "Contact Request Accepted", `Now you can chat with ${to}`);
 
     res.status(200).json({ success: true, message: "Accepted" });
   } catch (error) {
@@ -132,6 +143,7 @@ async function declineContactRequest(req, res, next) {
     const to = normalizeUsername(req.body.to);
 
     const toUser = await findUserByUsername(to);
+    const fromUser = await findUserByUsername(from);
     if (!toUser) return res.status(404).json({ error: "User not found" });
 
     toUser.contactRequests = toUser.contactRequests.filter((u) => u !== from);
@@ -144,6 +156,10 @@ async function declineContactRequest(req, res, next) {
         to: from,
         message: `${to} declined your contact request`,
       });
+    }
+
+    if (fromUser) {
+      await notifySenderWithFcm(fromUser, "Contact Request Declined", `${to} declined your contact request`);
     }
 
     res.status(200).json({ success: true, message: "Declined" });
