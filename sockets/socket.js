@@ -312,8 +312,6 @@ function setupSocket(io) {
         io.to(String(group)).emit("delete_message", { messageId });
       }
     });
-      io.to(normalizeUsername(payload.to)).emit("chat:seen", { messageId: payload.messageId });
-    });
 
     socket.on("join_group", (payload) => {
       const group = payload && payload.group;
