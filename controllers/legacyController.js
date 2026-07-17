@@ -28,9 +28,16 @@ async function findUserByUsername(username) {
 }
 
 function publicGroup(chat, usernamesById) {
+  const admins = (chat.groupAdmins || []).map((u) => usernamesById[String(u)] || "").filter(Boolean);
+  if (admins.length === 0 && chat.groupAdmin) {
+    admins.push(usernamesById[String(chat.groupAdmin)] || "");
+  }
+
   return {
     group: chat.chatName,
     owner: usernamesById[String(chat.groupAdmin)] || "",
+    admins: [...new Set(admins.filter(Boolean))],
+    description: chat.description || "",
     members: chat.users.map((u) => usernamesById[String(u)] || "").filter(Boolean),
     isGroup: true,
     chatId: String(chat._id),
@@ -236,6 +243,7 @@ async function createGroup(req, res, next) {
       isGroupChat: true,
       users: userIds,
       groupAdmin: ownerUser._id,
+      groupAdmins: [ownerUser._id],
     });
 
     const usernamesById = {
@@ -798,6 +806,105 @@ async function deleteStatus(req, res, next) {
   }
 }
 
+async function updateGroupDescription(req, res, next) {
+  try {
+    const group = String(req.body.group || "").trim();
+    const admin = normalizeUsername(req.body.admin);
+    const description = String(req.body.description || "").trim();
+    if (!group || !admin) return res.status(400).json({ error: "group and admin required" });
+
+    const adminUser = await findUserByUsername(admin);
+    if (!adminUser) return res.status(404).json({ error: "Admin not found" });
+
+    const chat = await Chat.findOne({ isGroupChat: true, chatName: group });
+    if (!chat) return res.status(404).json({ error: "Group not found" });
+
+    if (!chat.groupAdmins.includes(adminUser._id) && String(chat.groupAdmin) !== String(adminUser._id)) {
+      return res.status(403).json({ error: "Only admins can update description" });
+    }
+
+    chat.description = description;
+    await chat.save();
+
+    const io = req.app.get("io");
+    if (io) io.emit("group_updated", { group });
+
+    res.status(200).json({ success: true, message: "Description updated" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function addGroupAdmin(req, res, next) {
+  try {
+    const group = String(req.body.group || "").trim();
+    const admin = normalizeUsername(req.body.admin);
+    const member = normalizeUsername(req.body.member);
+    if (!group || !admin || !member) return res.status(400).json({ error: "group, admin, member required" });
+
+    const adminUser = await findUserByUsername(admin);
+    const memberUser = await findUserByUsername(member);
+    if (!adminUser || !memberUser) return res.status(404).json({ error: "User not found" });
+
+    const chat = await Chat.findOne({ isGroupChat: true, chatName: group });
+    if (!chat) return res.status(404).json({ error: "Group not found" });
+
+    if (!chat.groupAdmins.includes(adminUser._id) && String(chat.groupAdmin) !== String(adminUser._id)) {
+      return res.status(403).json({ error: "Only admins can add admins" });
+    }
+
+    if (!chat.users.includes(memberUser._id)) {
+      return res.status(400).json({ error: "User is not in the group" });
+    }
+
+    if (!chat.groupAdmins.includes(memberUser._id)) {
+      chat.groupAdmins.push(memberUser._id);
+      await chat.save();
+    }
+
+    const io = req.app.get("io");
+    if (io) io.emit("group_updated", { group });
+
+    res.status(200).json({ success: true, message: "Admin added" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function removeGroupAdmin(req, res, next) {
+  try {
+    const group = String(req.body.group || "").trim();
+    const admin = normalizeUsername(req.body.admin);
+    const member = normalizeUsername(req.body.member);
+    if (!group || !admin || !member) return res.status(400).json({ error: "group, admin, member required" });
+
+    const adminUser = await findUserByUsername(admin);
+    const memberUser = await findUserByUsername(member);
+    if (!adminUser || !memberUser) return res.status(404).json({ error: "User not found" });
+
+    const chat = await Chat.findOne({ isGroupChat: true, chatName: group });
+    if (!chat) return res.status(404).json({ error: "Group not found" });
+
+    if (String(chat.groupAdmin) !== String(adminUser._id) && !chat.groupAdmins.includes(adminUser._id)) {
+      return res.status(403).json({ error: "Only admins can remove admins" });
+    }
+
+    if (String(chat.groupAdmin) === String(memberUser._id)) {
+      return res.status(403).json({ error: "Cannot remove the main group owner" });
+    }
+
+    chat.groupAdmins = chat.groupAdmins.filter(id => String(id) !== String(memberUser._id));
+    await chat.save();
+
+    const io = req.app.get("io");
+    if (io) io.emit("group_updated", { group });
+
+    res.status(200).json({ success: true, message: "Admin removed" });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getContacts,
   sendContactRequest,
@@ -811,6 +918,9 @@ module.exports = {
   removeGroupMember,
   deleteGroup,
   leaveGroup,
+  updateGroupDescription,
+  addGroupAdmin,
+  removeGroupAdmin,
   saveFcmToken,
   savePublicKey,
   getPublicKey,

@@ -54,6 +54,22 @@ const legacyMessageSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
+    isForwarded: {
+      type: Boolean,
+      default: false,
+    },
+    replyTo: {
+      type: Object, // { messageId, text, sender }
+      default: null,
+    },
+    reactions: {
+      type: Array, // [{ user, emoji, createdAt }]
+      default: [],
+    },
+    deletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -63,4 +79,3 @@ const legacyMessageSchema = new mongoose.Schema(
 legacyMessageSchema.index({ kind: 1, conversationKey: 1, sentAt: 1 });
 
 module.exports = mongoose.model("LegacyMessage", legacyMessageSchema);
-

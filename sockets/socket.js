@@ -96,7 +96,15 @@ function setupSocket(io) {
     socket.on("chat_open", (payload) => {
       const room = payload && payload.chatId;
       if (!room || !socket.data.username) return;
+      socket.data.activeChat = String(room);
+      io.emit("presence:chat_status", { userId: socket.data.username, inChat: true });
       io.to(String(room)).emit("presence:active", { userId: socket.data.username });
+    });
+
+    socket.on("chat_close", () => {
+      if (!socket.data.username) return;
+      socket.data.activeChat = null;
+      io.emit("presence:chat_status", { userId: socket.data.username, inChat: false });
     });
 
     socket.on("join chat", (chatId) => {
@@ -182,6 +190,8 @@ function setupSocket(io) {
           iv: enc.iv,
           authTag: enc.authTag,
           sentAt: new Date(outgoing.timestamp),
+          isForwarded: !!payload.isForwarded,
+          replyTo: payload.replyTo || null,
         };
         await LegacyMessage.create(msgDoc);
         
@@ -240,6 +250,68 @@ function setupSocket(io) {
 
     socket.on("private_message_seen", (payload) => {
       if (!payload || !payload.to || !payload.messageId) return;
+      const to = normalizeUsername(payload.to);
+      const from = socket.data.username;
+      io.to(to).emit("chat:seen", { messageId: payload.messageId });
+    });
+
+    socket.on("message_reaction", async (payload) => {
+      if (!payload || !payload.messageId || !payload.emoji) return;
+      const username = socket.data.username;
+      if (!username) return;
+
+      const { messageId, emoji, to, group } = payload;
+      
+      try {
+        const msg = await LegacyMessage.findOne({ messageId });
+        if (msg) {
+          const reactions = msg.reactions || [];
+          const existing = reactions.find(r => r.user === username);
+          if (existing) {
+            existing.emoji = emoji;
+            existing.createdAt = new Date();
+          } else {
+            reactions.push({ user: username, emoji, createdAt: new Date() });
+          }
+          msg.reactions = reactions;
+          await msg.save();
+        }
+      } catch (e) {
+        console.warn("Reaction store error", e);
+      }
+
+      if (to) {
+        io.to(normalizeUsername(to)).emit("message_reaction", { messageId, emoji, user: username });
+        io.to(username).emit("message_reaction", { messageId, emoji, user: username });
+      } else if (group) {
+        io.to(String(group)).emit("message_reaction", { messageId, emoji, user: username });
+      }
+    });
+
+    socket.on("delete_message", async (payload) => {
+      if (!payload || !payload.messageId) return;
+      const username = socket.data.username;
+      if (!username) return;
+      
+      const { messageId, to, group } = payload;
+
+      try {
+        const msg = await LegacyMessage.findOne({ messageId });
+        if (msg && msg.from === username) {
+          msg.deletedForEveryone = true;
+          await msg.save();
+        }
+      } catch (e) {
+        console.warn("Delete message error", e);
+      }
+
+      if (to) {
+        io.to(normalizeUsername(to)).emit("delete_message", { messageId });
+        io.to(username).emit("delete_message", { messageId });
+      } else if (group) {
+        io.to(String(group)).emit("delete_message", { messageId });
+      }
+    });
       io.to(normalizeUsername(payload.to)).emit("chat:seen", { messageId: payload.messageId });
     });
 
@@ -281,6 +353,8 @@ function setupSocket(io) {
             iv: enc.iv,
             authTag: enc.authTag,
             sentAt: new Date(outgoing.timestamp),
+            isForwarded: !!payload.isForwarded,
+            replyTo: payload.replyTo || null,
           };
           await LegacyMessage.create(msgDoc);
           

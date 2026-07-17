@@ -12,6 +12,9 @@ const {
   removeGroupMember,
   deleteGroup,
   leaveGroup,
+  updateGroupDescription,
+  addGroupAdmin,
+  removeGroupAdmin,
   saveFcmToken,
   savePublicKey,
   getPublicKey,
@@ -43,6 +46,9 @@ router.post("/groups/add-member", addGroupMember);
 router.post("/groups/remove-member", removeGroupMember);
 router.post("/groups/delete", deleteGroup);
 router.post("/groups/leave", leaveGroup);
+router.post("/groups/update-description", updateGroupDescription);
+router.post("/groups/add-admin", addGroupAdmin);
+router.post("/groups/remove-admin", removeGroupAdmin);
 
 router.post("/messages/fcm-token", saveFcmToken);
 router.post("/messages/public-key", savePublicKey);
