@@ -256,7 +256,7 @@ function setupSocket(io) {
     });
 
     socket.on("message_reaction", async (payload) => {
-      if (!payload || !payload.messageId || !payload.emoji) return;
+      if (!payload || !payload.messageId || payload.emoji === undefined) return;
       const username = socket.data.username;
       if (!username) return;
 
@@ -265,13 +265,17 @@ function setupSocket(io) {
       try {
         const msg = await LegacyMessage.findOne({ messageId });
         if (msg) {
-          const reactions = msg.reactions || [];
-          const existing = reactions.find(r => r.user === username);
-          if (existing) {
-            existing.emoji = emoji;
-            existing.createdAt = new Date();
+          let reactions = msg.reactions || [];
+          if (!emoji) { // Remove reaction
+            reactions = reactions.filter(r => r.user !== username);
           } else {
-            reactions.push({ user: username, emoji, createdAt: new Date() });
+            const existing = reactions.find(r => r.user === username);
+            if (existing) {
+              existing.emoji = emoji;
+              existing.createdAt = new Date();
+            } else {
+              reactions.push({ user: username, emoji, createdAt: new Date() });
+            }
           }
           msg.reactions = reactions;
           await msg.save();
