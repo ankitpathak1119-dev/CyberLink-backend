@@ -29,6 +29,7 @@ const {
   addStatusComment,
   deleteStatus,
   syncFullOfflineStorage,
+  fetchStarredMessages,
 } = require("../controllers/legacyController");
 
 const router = express.Router();
@@ -57,6 +58,7 @@ router.get("/messages/pending/:username", fetchPendingMessages);
 router.delete("/messages/pending", deletePendingMessages);
 router.get("/messages/private/:userA/:userB", fetchPrivateHistory);
 router.get("/messages/group/:group", fetchGroupHistory);
+router.get("/messages/starred/:username", fetchStarredMessages);
 router.get("/sync/restore/:username", syncFullOfflineStorage);
 
 router.post("/status/create", createStatus);

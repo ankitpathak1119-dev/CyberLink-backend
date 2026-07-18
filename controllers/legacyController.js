@@ -905,6 +905,38 @@ async function removeGroupAdmin(req, res, next) {
   }
 }
 
+async function fetchStarredMessages(req, res, next) {
+  try {
+    const { username } = req.params;
+    if (!username) {
+      return res.status(400).json({ success: false, message: "Missing username" });
+    }
+
+    const messages = await LegacyMessage.find({ starredBy: username })
+      .sort({ sentAt: 1 })
+      .lean();
+
+    const formatted = messages.map((m) => ({
+      messageId: m.messageId,
+      from: m.from,
+      to: m.to,
+      group: m.group,
+      timestamp: m.sentAt,
+      message: m.cipherText,
+      isForwarded: m.isForwarded,
+      deletedForEveryone: m.deletedForEveryone,
+      replyTo: m.replyTo,
+      reactions: m.reactions,
+      state: m.status,
+      starredBy: m.starredBy,
+    }));
+
+    res.status(200).json(formatted);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getContacts,
   sendContactRequest,
@@ -935,4 +967,5 @@ module.exports = {
   addStatusComment,
   deleteStatus,
   syncFullOfflineStorage,
+  fetchStarredMessages,
 };

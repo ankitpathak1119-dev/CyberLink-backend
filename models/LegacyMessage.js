@@ -25,6 +25,17 @@ const legacyMessageSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "seen"],
+      default: "sent",
+      index: true,
+    },
+    starredBy: {
+      type: [String],
+      default: [],
+      index: true,
+    },
     group: {
       type: String,
       trim: true,

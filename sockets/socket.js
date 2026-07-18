@@ -317,6 +317,37 @@ function setupSocket(io) {
       }
     });
 
+    socket.on("star_message", async (payload) => {
+      if (!payload || !payload.messageId || payload.star === undefined) return;
+      const username = socket.data.username;
+      if (!username) return;
+
+      const { messageId, star, to, group } = payload;
+      
+      try {
+        const msg = await LegacyMessage.findOne({ messageId });
+        if (msg) {
+          let starredBy = msg.starredBy || [];
+          if (star) {
+            if (!starredBy.includes(username)) starredBy.push(username);
+          } else {
+            starredBy = starredBy.filter(u => u !== username);
+          }
+          msg.starredBy = starredBy;
+          await msg.save();
+        }
+      } catch (e) {
+        console.warn("Star message store error", e);
+      }
+
+      if (to) {
+        io.to(normalizeUsername(to)).emit("star_message", { messageId, star, user: username });
+        io.to(username).emit("star_message", { messageId, star, user: username });
+      } else if (group) {
+        io.to(String(group)).emit("star_message", { messageId, star, user: username });
+      }
+    });
+
     socket.on("join_group", (payload) => {
       const group = payload && payload.group;
       if (!group) return;
@@ -438,6 +469,37 @@ function setupSocket(io) {
         return;
       }
       socket.to(String(payload.chatId)).emit("messages seen", payload);
+    });
+
+    socket.on("webrtc_offer", (payload) => {
+      if (!payload || !payload.to || !payload.offer) return;
+      io.to(normalizeUsername(payload.to)).emit("webrtc_offer", {
+        from: socket.data.username,
+        offer: payload.offer,
+      });
+    });
+
+    socket.on("webrtc_answer", (payload) => {
+      if (!payload || !payload.to || !payload.answer) return;
+      io.to(normalizeUsername(payload.to)).emit("webrtc_answer", {
+        from: socket.data.username,
+        answer: payload.answer,
+      });
+    });
+
+    socket.on("webrtc_ice_candidate", (payload) => {
+      if (!payload || !payload.to || !payload.candidate) return;
+      io.to(normalizeUsername(payload.to)).emit("webrtc_ice_candidate", {
+        from: socket.data.username,
+        candidate: payload.candidate,
+      });
+    });
+
+    socket.on("webrtc_end_call", (payload) => {
+      if (!payload || !payload.to) return;
+      io.to(normalizeUsername(payload.to)).emit("webrtc_end_call", {
+        from: socket.data.username,
+      });
     });
 
     socket.on("disconnect", () => {
