@@ -31,6 +31,7 @@ const {
   fetchStarredMessages,
   deleteMessageForMe,
   deleteMessageForEveryone,
+  addStatusComment,
 } = require("../controllers/legacyController");
 
 const router = express.Router();
