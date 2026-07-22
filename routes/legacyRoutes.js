@@ -26,10 +26,11 @@ const {
   getStatusFeed,
   markStatusViewed,
   toggleStatusLike,
-  addStatusComment,
   deleteStatus,
   syncFullOfflineStorage,
   fetchStarredMessages,
+  deleteMessageForMe,
+  deleteMessageForEveryone,
 } = require("../controllers/legacyController");
 
 const router = express.Router();
@@ -59,6 +60,8 @@ router.delete("/messages/pending", deletePendingMessages);
 router.get("/messages/private/:userA/:userB", fetchPrivateHistory);
 router.get("/messages/group/:group", fetchGroupHistory);
 router.get("/messages/starred/:username", fetchStarredMessages);
+router.post("/messages/delete-for-me", deleteMessageForMe);
+router.post("/messages/delete-for-everyone", deleteMessageForEveryone);
 router.get("/sync/restore/:username", syncFullOfflineStorage);
 
 router.post("/status/create", createStatus);

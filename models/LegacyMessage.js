@@ -81,6 +81,11 @@ const legacyMessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    deletedFor: {
+      type: [String],
+      default: [],
+      index: true,
+    },
   },
   {
     timestamps: true,

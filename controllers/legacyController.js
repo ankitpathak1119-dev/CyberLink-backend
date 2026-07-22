@@ -480,6 +480,7 @@ async function fetchPrivateHistory(req, res, next) {
     const docs = await LegacyMessage.find({
       kind: "private",
       conversationKey: key,
+      deletedFor: { $ne: userA },
     })
       .sort({ sentAt: 1 })
       .limit(limit);
@@ -555,10 +556,16 @@ async function fetchGroupHistory(req, res, next) {
       ? Math.max(1, Math.min(limitRaw, 2000))
       : 500;
     const key = groupConversationKey(group);
-    const docs = await LegacyMessage.find({
+    const myUser = req.query.myUser;
+    const query = {
       kind: "group",
       conversationKey: key,
-    })
+    };
+    if (myUser) {
+      query.deletedFor = { $ne: myUser };
+    }
+
+    const docs = await LegacyMessage.find(query)
       .sort({ sentAt: 1 })
       .limit(limit);
 
@@ -937,6 +944,61 @@ async function fetchStarredMessages(req, res, next) {
   }
 }
 
+async function deleteMessageForMe(req, res, next) {
+  try {
+    const { messageId, username } = req.body;
+    if (!messageId || !username) {
+      return res.status(400).json({ error: "messageId and username required" });
+    }
+
+    await LegacyMessage.updateMany(
+      { messageId: messageId },
+      { $addToSet: { deletedFor: username } }
+    );
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deleteMessageForEveryone(req, res, next) {
+  try {
+    const { messageId, username } = req.body;
+    if (!messageId || !username) {
+      return res.status(400).json({ error: "messageId and username required" });
+    }
+
+    const msg = await LegacyMessage.findOne({ messageId: messageId });
+    if (!msg) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    // Optional: Validate that 'username' is the sender (msg.from === username)
+    if (msg.from !== username) {
+      return res.status(403).json({ error: "Only the sender can delete for everyone" });
+    }
+
+    msg.deletedForEveryone = true;
+    await msg.save();
+
+    // Broadcast to users via socket that a message was deleted for everyone
+    const io = req.app.get("io");
+    if (io) {
+      if (msg.kind === "private") {
+        io.to(msg.to).emit("message_deleted", { messageId, conversationKey: msg.conversationKey });
+        io.to(msg.from).emit("message_deleted", { messageId, conversationKey: msg.conversationKey });
+      } else if (msg.kind === "group") {
+        io.to(msg.group).emit("message_deleted", { messageId, conversationKey: msg.conversationKey });
+      }
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getContacts,
   sendContactRequest,
@@ -968,4 +1030,6 @@ module.exports = {
   deleteStatus,
   syncFullOfflineStorage,
   fetchStarredMessages,
+  deleteMessageForMe,
+  deleteMessageForEveryone,
 };
