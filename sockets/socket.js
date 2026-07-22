@@ -317,6 +317,33 @@ function setupSocket(io) {
       }
     });
 
+    socket.on("edit_message", async (payload) => {
+      if (!payload || !payload.messageId || !payload.newText) return;
+      const username = socket.data.username;
+      if (!username) return;
+      
+      const { messageId, newText, to, group } = payload;
+
+      try {
+        const msg = await LegacyMessage.findOne({ messageId });
+        // Ensure it's the sender editing it
+        if (msg && msg.from === username) {
+          msg.message = newText;
+          msg.edited = true;
+          await msg.save();
+        }
+      } catch (e) {
+        console.warn("Edit message error", e);
+      }
+
+      if (to) {
+        io.to(normalizeUsername(to)).emit("edit_message", { messageId, newText });
+        io.to(username).emit("edit_message", { messageId, newText });
+      } else if (group) {
+        io.to(String(group)).emit("edit_message", { messageId, newText });
+      }
+    });
+
     socket.on("star_message", async (payload) => {
       if (!payload || !payload.messageId || payload.star === undefined) return;
       const username = socket.data.username;
