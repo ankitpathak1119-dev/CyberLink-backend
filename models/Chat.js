@@ -16,6 +16,10 @@ const chatSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    profilePic: {
+      type: String,
+      default: "",
+    },
     users: [
       {
         type: mongoose.Schema.Types.ObjectId,

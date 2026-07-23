@@ -13,6 +13,7 @@ const {
   deleteGroup,
   leaveGroup,
   updateGroupDescription,
+  updateGroupProfilePic,
   addGroupAdmin,
   removeGroupAdmin,
   saveFcmToken,
@@ -50,6 +51,7 @@ router.post("/groups/remove-member", removeGroupMember);
 router.post("/groups/delete", deleteGroup);
 router.post("/groups/leave", leaveGroup);
 router.post("/groups/update-description", updateGroupDescription);
+router.post("/groups/update-pic", updateGroupProfilePic);
 router.post("/groups/add-admin", addGroupAdmin);
 router.post("/groups/remove-admin", removeGroupAdmin);
 

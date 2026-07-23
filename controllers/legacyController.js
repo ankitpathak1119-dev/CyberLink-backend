@@ -224,6 +224,8 @@ async function createGroup(req, res, next) {
     const group = String(req.body.group || "").trim();
     const owner = normalizeUsername(req.body.owner);
     const members = dedupe(req.body.members || []);
+    const description = String(req.body.description || "").trim();
+    const profilePic = String(req.body.profilePic || "").trim();
 
     if (!group || !owner) return res.status(400).json({ error: "group and owner required" });
 
@@ -241,6 +243,8 @@ async function createGroup(req, res, next) {
     const chat = await Chat.create({
       chatName: group,
       isGroupChat: true,
+      description: description,
+      profilePic: profilePic,
       users: userIds,
       groupAdmin: ownerUser._id,
       groupAdmins: [ownerUser._id],
@@ -813,6 +817,35 @@ async function deleteStatus(req, res, next) {
   }
 }
 
+async function updateGroupProfilePic(req, res, next) {
+  try {
+    const group = String(req.body.group || "").trim();
+    const admin = normalizeUsername(req.body.admin);
+    const profilePic = String(req.body.profilePic || "").trim();
+
+    if (!group || !admin) return res.status(400).json({ error: "group and admin required" });
+
+    const adminUser = await findUserByUsername(admin);
+    if (!adminUser) return res.status(404).json({ error: "User not found" });
+
+    const chat = await Chat.findOne({ isGroupChat: true, chatName: group });
+    if (!chat) return res.status(404).json({ error: "Group not found" });
+    if (!chat.groupAdmins.includes(adminUser._id)) {
+      return res.status(403).json({ error: "Only admins can update group DP" });
+    }
+
+    chat.profilePic = profilePic;
+    await chat.save();
+
+    const io = req.app.get("io");
+    if (io) io.emit("group_updated", { group });
+
+    res.status(200).json({ success: true, message: "Profile picture updated" });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function updateGroupDescription(req, res, next) {
   try {
     const group = String(req.body.group || "").trim();
@@ -1013,6 +1046,7 @@ module.exports = {
   deleteGroup,
   leaveGroup,
   updateGroupDescription,
+  updateGroupProfilePic,
   addGroupAdmin,
   removeGroupAdmin,
   saveFcmToken,
