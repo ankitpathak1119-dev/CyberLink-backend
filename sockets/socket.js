@@ -18,12 +18,18 @@ function normalizeUsername(raw) {
 
 function setupSocket(io) {
   function getOnlineUsers() {
-    const users = new Set();
+    const users = new Map();
     for (const s of io.sockets.sockets.values()) {
       const u = normalizeUsername(s.data && s.data.username);
-      if (u) users.add(u);
+      if (u && !users.has(u)) {
+        users.set(u, {
+          username: u,
+          activeChat: s.data.activeChat || null,
+          activeGroup: s.data.activeGroup || null
+        });
+      }
     }
-    return [...users];
+    return Array.from(users.values());
   }
 
   function emitPresenceSnapshot(targetSocket) {
@@ -385,12 +391,20 @@ function setupSocket(io) {
       const group = payload && payload.group;
       if (!group) return;
       socket.join(`group:${group}`);
+      if (socket.data.username) {
+        socket.data.activeGroup = String(group);
+        io.emit("presence:group_status", { userId: socket.data.username, inGroup: true });
+      }
     });
 
     socket.on("leave_group", (payload) => {
       const group = payload && payload.group;
       if (!group) return;
       socket.leave(`group:${group}`);
+      if (socket.data.username) {
+        socket.data.activeGroup = null;
+        io.emit("presence:group_status", { userId: socket.data.username, inGroup: false });
+      }
     });
 
     socket.on("group_message", async (payload) => {
