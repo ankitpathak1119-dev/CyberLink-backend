@@ -47,7 +47,8 @@ async function register(req, res, next) {
     const normalizedUsername = username ? normalizeUsername(username) : null;
     const existingByEmail = await User.findOne({ email: normalizedEmail }).select("_id");
     if (existingByEmail) {
-      const error = new Error("Email already registered");
+      const isUsernameOnly = req.body.username && !req.body.email;
+      const error = new Error(isUsernameOnly ? "User ID already present. Choose a new User ID." : "Email already registered");
       error.statusCode = 409;
       throw error;
     }
