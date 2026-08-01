@@ -206,6 +206,8 @@ async function sendContactRequest(req, res, next) {
     const from = normalizeUsername(req.body.from);
     const to = normalizeUsername(req.body.to);
 
+    if (!from || !to) return res.status(400).json({ error: "Invalid sender or recipient" });
+
     const toUser = await findUserByUsername(to);
     if (!toUser) return res.status(404).json({ error: "User not found" });
 
@@ -233,7 +235,9 @@ async function getContactRequests(req, res, next) {
     const user = await findUserByUsername(req.params.user);
     if (!user) return res.status(200).json({ requests: [] });
 
-    const requests = dedupe(user.contactRequests).map((from) => ({ from }));
+    const requests = dedupe(user.contactRequests)
+      .filter((from) => from && from.trim() !== "")
+      .map((from) => ({ from }));
     res.status(200).json({ requests });
   } catch (error) {
     next(error);
@@ -259,6 +263,8 @@ async function acceptContactRequest(req, res, next) {
   try {
     const from = normalizeUsername(req.body.from);
     const to = normalizeUsername(req.body.to);
+
+    if (!from || !to) return res.status(400).json({ error: "Invalid sender or recipient" });
 
     const fromUser = await findUserByUsername(from);
     const toUser = await findUserByUsername(to);
@@ -295,6 +301,8 @@ async function declineContactRequest(req, res, next) {
   try {
     const from = normalizeUsername(req.body.from);
     const to = normalizeUsername(req.body.to);
+
+    if (!from || !to) return res.status(400).json({ error: "Invalid sender or recipient" });
 
     const toUser = await findUserByUsername(to);
     const fromUser = await findUserByUsername(from);
