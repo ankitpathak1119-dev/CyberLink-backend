@@ -59,6 +59,16 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    blockedUsers: {
+      type: [String],
+      default: [],
+    },
+    privacySettings: {
+      lastSeen: { type: String, enum: ["everyone", "contacts", "nobody"], default: "everyone" },
+      readReceipts: { type: Boolean, default: true },
+      profilePhoto: { type: String, enum: ["everyone", "contacts", "nobody"], default: "everyone" },
+      about: { type: String, enum: ["everyone", "contacts", "nobody"], default: "everyone" },
+    },
     contacts: {
       type: [String],
       default: [],

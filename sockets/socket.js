@@ -168,6 +168,12 @@ function setupSocket(io) {
       const from = normalizeUsername(payload.from);
       if (!to || !from) return;
 
+      // Block check: if recipient has blocked sender, silently drop
+      try {
+        const recipientUser = await User.findOne({ username: to }).select("blockedUsers");
+        if (recipientUser && (recipientUser.blockedUsers || []).includes(from)) return;
+      } catch (_) {}
+
       const outgoing = {
         ...payload,
         to,

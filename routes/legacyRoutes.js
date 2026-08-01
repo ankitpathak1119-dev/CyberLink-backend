@@ -33,6 +33,14 @@ const {
   deleteMessageForMe,
   deleteMessageForEveryone,
   addStatusComment,
+  updateProfile,
+  getProfile,
+  updatePrivacySettings,
+  getPrivacySettings,
+  blockUser,
+  unblockUser,
+  getBlockedUsers,
+  reportUser,
 } = require("../controllers/legacyController");
 
 const router = express.Router();
@@ -73,5 +81,19 @@ router.post("/status/view", markStatusViewed);
 router.post("/status/like", toggleStatusLike);
 router.post("/status/comment", addStatusComment);
 router.delete("/status/:statusId/:owner", deleteStatus);
+
+// Fix 1 — Profile
+router.post("/profile/update", updateProfile);
+router.get("/profile/:username", getProfile);
+
+// Fix 2 — Privacy Settings
+router.post("/profile/privacy/update", updatePrivacySettings);
+router.get("/profile/:username/privacy", getPrivacySettings);
+
+// Fix 3 — Block / Unblock / Report
+router.post("/contacts/block", blockUser);
+router.post("/contacts/unblock", unblockUser);
+router.get("/contacts/blocked/:username", getBlockedUsers);
+router.post("/contacts/report", reportUser);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const Chat = require("../models/Chat");
 const User = require("../models/User");
+const Report = require("../models/Report");
 const LegacyMessage = require("../models/LegacyMessage");
 const Status = require("../models/Status");
 const {
@@ -42,6 +43,152 @@ function publicGroup(chat, usernamesById) {
     isGroup: true,
     chatId: String(chat._id),
   };
+}
+
+// ── FIX 1: Profile Update & Get ───────────────────────────────────────────
+async function updateProfile(req, res, next) {
+  try {
+    const username = normalizeUsername(req.body.username);
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (typeof req.body.name !== "undefined") user.name = String(req.body.name).trim();
+    if (typeof req.body.bio !== "undefined") user.bio = String(req.body.bio).trim();
+    if (typeof req.body.avatarUrl !== "undefined") user.avatar = String(req.body.avatarUrl).trim();
+    await user.save();
+
+    // Notify contacts via socket
+    const io = req.app.get("io");
+    if (io) {
+      const contactsToNotify = user.contacts || [];
+      const payload = { username, name: user.name, bio: user.bio, avatar: user.avatar };
+      for (const contact of contactsToNotify) {
+        io.to(contact).emit("profile_updated", payload);
+      }
+    }
+
+    res.status(200).json({ success: true, user: { username, name: user.name, bio: user.bio, avatar: user.avatar } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getProfile(req, res, next) {
+  try {
+    const username = normalizeUsername(req.params.username);
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.status(200).json({
+      success: true,
+      user: { username, name: user.name, bio: user.bio, avatar: user.avatar },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ── FIX 2: Privacy Settings ────────────────────────────────────────────────
+async function updatePrivacySettings(req, res, next) {
+  try {
+    const username = normalizeUsername(req.body.username);
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const incoming = req.body.privacySettings || {};
+    const current = user.privacySettings || {};
+    const allowed = ["everyone", "contacts", "nobody"];
+
+    if (incoming.lastSeen && allowed.includes(incoming.lastSeen)) current.lastSeen = incoming.lastSeen;
+    if (incoming.profilePhoto && allowed.includes(incoming.profilePhoto)) current.profilePhoto = incoming.profilePhoto;
+    if (incoming.about && allowed.includes(incoming.about)) current.about = incoming.about;
+    if (typeof incoming.readReceipts === "boolean") current.readReceipts = incoming.readReceipts;
+
+    user.privacySettings = current;
+    user.markModified("privacySettings");
+    await user.save();
+
+    res.status(200).json({ success: true, privacySettings: user.privacySettings });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getPrivacySettings(req, res, next) {
+  try {
+    const username = normalizeUsername(req.params.username);
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const defaults = { lastSeen: "everyone", readReceipts: true, profilePhoto: "everyone", about: "everyone" };
+    res.status(200).json({ success: true, privacySettings: user.privacySettings || defaults });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ── FIX 3: Block / Unblock / Report ───────────────────────────────────────
+async function blockUser(req, res, next) {
+  try {
+    const blocker = normalizeUsername(req.body.blocker);
+    const blocked = normalizeUsername(req.body.blocked);
+    if (!blocker || !blocked || blocker === blocked) return res.status(400).json({ error: "Invalid request" });
+
+    const blockerUser = await findUserByUsername(blocker);
+    if (!blockerUser) return res.status(404).json({ error: "User not found" });
+
+    if (!blockerUser.blockedUsers.includes(blocked)) {
+      blockerUser.blockedUsers.push(blocked);
+      await blockerUser.save();
+    }
+    res.status(200).json({ success: true, message: `${blocked} blocked` });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function unblockUser(req, res, next) {
+  try {
+    const blocker = normalizeUsername(req.body.blocker);
+    const blocked = normalizeUsername(req.body.blocked);
+
+    const blockerUser = await findUserByUsername(blocker);
+    if (!blockerUser) return res.status(404).json({ error: "User not found" });
+
+    blockerUser.blockedUsers = blockerUser.blockedUsers.filter((u) => u !== blocked);
+    await blockerUser.save();
+
+    res.status(200).json({ success: true, message: `${blocked} unblocked` });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getBlockedUsers(req, res, next) {
+  try {
+    const username = normalizeUsername(req.params.username);
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.status(200).json({ success: true, blockedUsers: user.blockedUsers || [] });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function reportUser(req, res, next) {
+  try {
+    const reporter = normalizeUsername(req.body.reporter);
+    const reported = normalizeUsername(req.body.reported);
+    const reason = String(req.body.reason || "").trim();
+
+    if (!reporter || !reported || reporter === reported) return res.status(400).json({ error: "Invalid request" });
+
+    await Report.create({ reporter, reported, reason });
+    res.status(200).json({ success: true, message: "Report submitted" });
+  } catch (error) {
+    next(error);
+  }
 }
 
 async function getContacts(req, res, next) {
@@ -1066,4 +1213,12 @@ module.exports = {
   fetchStarredMessages,
   deleteMessageForMe,
   deleteMessageForEveryone,
+  updateProfile,
+  getProfile,
+  updatePrivacySettings,
+  getPrivacySettings,
+  blockUser,
+  unblockUser,
+  getBlockedUsers,
+  reportUser,
 };
